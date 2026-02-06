@@ -8,6 +8,7 @@ export interface UpdateSuggestion {
   major?: string;
   minor?: string;
   patch?: string;
+  catalog?: string;
 }
 
 export function getUpdateSuggestion(
@@ -38,16 +39,35 @@ export function getUpdateSuggestion(
   const latestPatch = patches[patches.length - 1];
   const latestMinor = minors[minors.length - 1];
 
-  if (latestPatch && semver.gt(latestPatch, current)) {
-    suggestion.patch = latestPatch;
-  }
-
-  if (latestMinor && semver.gt(latestMinor, current)) {
-    suggestion.minor = latestMinor;
-  }
+  console.log(`[getUpdateSuggestion] ${currentRange} (${current}): latest=${latest}, latestMinor=${latestMinor}, latestPatch=${latestPatch}`);
 
   if (latest && semver.gt(latest, current)) {
-    suggestion.major = latest;
+    const diff = semver.diff(current, latest);
+
+    // 我们总是记录绝对最新的版本到其分类中
+    if (diff === "major" || diff === "premajor") {
+      suggestion.major = latest;
+    } else if (diff === "minor" || diff === "preminor") {
+      suggestion.minor = latest;
+    } else if (diff === "patch" || diff === "prepatch" || diff === "prerelease") {
+      suggestion.patch = latest;
+    }
+
+    // 无论绝对最新是什么版本，我们都尝试补全当前范围内的“最安全”更高版本
+    // 补丁更新 (Tilde range)
+    const latestPatch = patches[patches.length - 1];
+    if (latestPatch && semver.gt(latestPatch, current)) {
+      suggestion.patch = latestPatch;
+    }
+
+    // 次要更新 (Caret range)
+    const latestMinor = minors[minors.length - 1];
+    if (latestMinor && semver.gt(latestMinor, current)) {
+      // 只有当最新次要版本 比 我们已找到的补丁更新 还要新时才记录
+      if (!suggestion.patch || semver.gt(latestMinor, suggestion.patch)) {
+        suggestion.minor = latestMinor;
+      }
+    }
   }
 
   // If no updates available

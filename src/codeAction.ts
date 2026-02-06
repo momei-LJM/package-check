@@ -2,7 +2,6 @@ import * as vscode from "vscode";
 import { parsePackageJson, parsePnpmWorkspaceYaml } from "./parser";
 import { getUpdateSuggestion } from "./version";
 import { getPackageMetaWithCache } from "./npm";
-import { getPnpmCatalogs } from "./pnpm";
 
 export class UpdateCodeActionProvider implements vscode.CodeActionProvider {
   async provideCodeActions(
@@ -15,13 +14,8 @@ export class UpdateCodeActionProvider implements vscode.CodeActionProvider {
     const deps = isYaml
       ? parsePnpmWorkspaceYaml(document)
       : parsePackageJson(document);
-    // debugger;
 
-    // 终极兜底：如果光标在依赖行的任意位置都触发灯泡，彻底兼容 VS Code YAML 行偏移 bug
     const cursorLine = range.start.line;
-    const txt = document.getText();
-    console.log("11111111", cursorLine, txt);
-
     const dep = deps.find(
       (d) =>
         d.range.contains(range) ||
@@ -29,18 +23,13 @@ export class UpdateCodeActionProvider implements vscode.CodeActionProvider {
         d.range.start.line === cursorLine ||
         d.range.end.line === cursorLine,
     );
-    // debugger
-
     if (!dep) return [];
 
     const workspaceRoot = vscode.workspace.getWorkspaceFolder(document.uri)?.uri
       .fsPath;
     let version = dep.version;
-    if (!isYaml && version.startsWith("catalog:") && workspaceRoot) {
-      const catalogs = await getPnpmCatalogs(workspaceRoot);
-      const catalogName = version.split(":")[1] || "default";
-      version = catalogs[catalogName]?.[dep.name] || version;
-    }
+    const isCatalog = !isYaml && version.startsWith("catalog:");
+    if (isCatalog) return [];
 
     const meta = await getPackageMetaWithCache(dep.name);
     if (!meta) return [];

@@ -3,12 +3,42 @@ import { parsePackageJson, parsePnpmWorkspaceYaml } from "./parser";
 import { getPackageMetaWithCache } from "./npm";
 import { getUpdateSuggestion, UpdateSuggestion } from "./version";
 import { updateDecorations, diagnosticCollection } from "./ui";
-import { getPnpmCatalogs, findPackageJsons } from "./pnpm";
+import { getPnpmCatalogs } from "./pnpm";
 import { UpdateCodeActionProvider } from "./codeAction";
 
 export async function activate(context: vscode.ExtensionContext) {
   console.log("package-check is now active");
   let checkTimeout: NodeJS.Timeout | undefined;
+
+  type WorkspaceConfig = {
+    hasPnpmWorkspaceYaml: boolean;
+  };
+
+  const workspaceConfigCache = new Map<string, WorkspaceConfig>();
+
+  async function detectWorkspaceConfig(
+    folder: vscode.WorkspaceFolder,
+  ): Promise<WorkspaceConfig> {
+    const pnpmWorkspace = await vscode.workspace.findFiles(
+      new vscode.RelativePattern(folder, "**/pnpm-workspace.yaml"),
+      "**/node_modules/**",
+      1,
+    );
+    return {
+      hasPnpmWorkspaceYaml: pnpmWorkspace.length > 0,
+    };
+  }
+
+  async function refreshWorkspaceConfigs() {
+    const folders = vscode.workspace.workspaceFolders;
+    if (!folders) return;
+    await Promise.all(
+      folders.map(async (folder) => {
+        const config = await detectWorkspaceConfig(folder);
+        workspaceConfigCache.set(folder.uri.toString(), config);
+      }),
+    );
+  }
 
   context.subscriptions.push(
     vscode.languages.registerCodeActionsProvider(
@@ -36,12 +66,17 @@ export async function activate(context: vscode.ExtensionContext) {
       : parsePnpmWorkspaceYaml(document);
     const suggestions = new Map<string, UpdateSuggestion>();
 
-    const workspaceRoot = vscode.workspace.getWorkspaceFolder(document.uri)?.uri
-      .fsPath;
+    const workspaceFolder = vscode.workspace.getWorkspaceFolder(document.uri);
+    const workspaceRoot = workspaceFolder?.uri.fsPath;
 
     let catalogs: Record<string, any> = {};
-    if (workspaceRoot && isPackageJson) {
-      catalogs = await getPnpmCatalogs(workspaceRoot);
+    if (workspaceRoot && isPackageJson && workspaceFolder) {
+      const config = workspaceConfigCache.get(
+        workspaceFolder.uri.toString(),
+      );
+      if (config?.hasPnpmWorkspaceYaml) {
+        catalogs = await getPnpmCatalogs(workspaceRoot);
+      }
     }
 
     const promises = deps.map(async (dep) => {
@@ -70,58 +105,33 @@ export async function activate(context: vscode.ExtensionContext) {
           meta.latest,
         );
         if (suggestion) {
+          if (isPackageJson && version.startsWith("catalog:")) {
+            suggestion.catalog = version.split(":")[1] || "default";
+          }
           suggestions.set(dep.name, suggestion);
         }
       }
     });
 
     await Promise.all(promises);
-    if (editor) {
-      updateDecorations(editor, suggestions);
-    } else {
-      const diagnostics: vscode.Diagnostic[] = [];
-      for (const dep of deps) {
-        const suggestion = suggestions.get(dep.name);
-        if (suggestion) {
-          const diag = new vscode.Diagnostic(
-            dep.range,
-            `Update available for ${dep.name}: ${suggestion.current} -> ${suggestion.major || suggestion.minor || suggestion.patch}`,
-            vscode.DiagnosticSeverity.Information,
-          );
-          diag.source = "package-check";
-          diagnostics.push(diag);
-        }
-      }
-      diagnosticCollection.set(document.uri, diagnostics);
-    }
+    if (!editor) { return }
+    updateDecorations(editor, suggestions);
   }
 
-  async function checkAllWorkspace() {
-    const folders = vscode.workspace.workspaceFolders;
-    if (!folders) return;
-    for (const folder of folders) {
-      const uris = await findPackageJsons(folder.uri.fsPath);
-      for (const uri of uris) {
-        try {
-          // 只有当文档已经打开或者我们明确需要它时才使用 openTextDocument
-          // 为了减少 "AST tracker" 报错，我们先尝试获取已打开的文档
-          let doc = vscode.workspace.textDocuments.find(
-            (d) => d.uri.toString() === uri.toString(),
-          );
-          if (!doc) {
-            doc = await vscode.workspace.openTextDocument(uri);
-          }
-          await checkDocument(doc);
-        } catch (e) {
-          console.error(`Failed to check ${uri.fsPath}:`, e);
-        }
-      }
+  async function checkOpenDocuments() {
+    const docs = new Set<vscode.TextDocument>();
+    for (const doc of vscode.workspace.textDocuments) {
+      docs.add(doc);
     }
+    for (const editor of vscode.window.visibleTextEditors) {
+      docs.add(editor.document);
+    }
+    await Promise.all(Array.from(docs).map((doc) => checkDocument(doc)));
   }
 
   function triggerCheck(document: vscode.TextDocument) {
     if (checkTimeout) clearTimeout(checkTimeout);
-    checkTimeout = setTimeout(() => checkDocument(document), 500);
+    checkTimeout = setTimeout(() => checkDocument(document), 100);
   }
 
   context.subscriptions.push(
@@ -134,12 +144,15 @@ export async function activate(context: vscode.ExtensionContext) {
       if (editor) checkDocument(editor.document);
     }),
     vscode.commands.registerCommand("package-check.checkUpdates", () => {
-      checkAllWorkspace();
+      checkOpenDocuments();
+    }),
+    vscode.workspace.onDidChangeWorkspaceFolders(() => {
+      refreshWorkspaceConfigs();
     }),
   );
 
-  // Start check all workspace
-  checkAllWorkspace();
+  await refreshWorkspaceConfigs();
+  checkOpenDocuments();
 }
 
-export function deactivate() {}
+export function deactivate() { }
