@@ -3,10 +3,12 @@
   "displayName": "Package Check",
   "description": "Check package.json dependencies for updates",
   "version": "0.0.1",
-  "publisher": "momei",
+  "icon": "icon.png",
+  "publisher": "momei-package-check",
   "engines": {
     "vscode": "^1.75.0"
   },
+  "id": "momei-package-check",
   "categories": [
     "Other"
   ],
@@ -36,7 +38,8 @@
   "files": [
     "dist/**",
     "package.json",
-    "README.md"
+    "README.md",
+    "icon.png"
   ],
   "keywords": [
     "vscode",
