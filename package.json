@@ -23,9 +23,33 @@
       }
     ]
   },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/momei-LJM/package-check.git"
+  },
+  "bugs": {
+    "url": "https://github.com/momei-LJM/package-check/issues"
+  },
+  "homepage": "https://github.com/momei-LJM/package-check#readme",
+  "license": "MIT",
+  "author": "momei",
+  "files": [
+    "dist/**",
+    "package.json",
+    "README.md"
+  ],
+  "keywords": [
+    "vscode",
+    "extension",
+    "package",
+    "npm",
+    "pnpm",
+    "dependencies"
+  ],
   "scripts": {
     "dev": "tsdown --watch",
     "build": "tsdown",
+    "pack": "vsce package --no-dependencies --allow-missing-repository",
     "vscode:prepublish": "npm run build"
   },
   "devDependencies": {
