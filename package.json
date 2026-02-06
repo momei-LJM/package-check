@@ -39,7 +39,10 @@
     "dist/**",
     "package.json",
     "README.md",
-    "public/icon.png"
+    "public/icon.png",
+    "public/example1.png",
+    "public/example2.png",
+    "public/example3.png"
   ],
   "keywords": [
     "vscode",

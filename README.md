@@ -16,6 +16,12 @@ Package Check is a Visual Studio Code extension that detects available updates f
 
 - Open a `package.json` or `pnpm-workspace.yaml` file. If updates are available, tags are shown next to dependency version fields. Use the Code Action (lightbulb) on a dependency to apply updates.
 
+## Screenshots
+
+![Example 1](public/example1.png)
+![Example 2](public/example2.png)
+![Example 3](public/example3.png)
+
 ## Development
 
 - Run `pnpm run dev` to start the watch build.
