@@ -1,0 +1,44 @@
+{
+  "name": "package-check",
+  "displayName": "Package Check",
+  "description": "Check package.json dependencies for updates",
+  "version": "0.0.1",
+  "publisher": "momei",
+  "engines": {
+    "vscode": "^1.75.0"
+  },
+  "categories": [
+    "Other"
+  ],
+  "activationEvents": [
+    "onLanguage:json",
+    "onLanguage:yaml"
+  ],
+  "main": "./dist/index.cjs",
+  "contributes": {
+    "commands": [
+      {
+        "command": "package-check.checkUpdates",
+        "title": "Package Check: Check for Updates"
+      }
+    ]
+  },
+  "scripts": {
+    "dev": "tsdown --watch",
+    "build": "tsdown",
+    "vscode:prepublish": "npm run build"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "@types/semver": "^7.5.0",
+    "@types/vscode": "^1.75.0",
+    "tsdown": "latest",
+    "typescript": "^5.0.0"
+  },
+  "dependencies": {
+    "fast-npm-meta": "^1.0.0",
+    "jsonc-parser": "^3.3.1",
+    "semver": "^7.5.0",
+    "yaml": "^2.8.2"
+  }
+}
