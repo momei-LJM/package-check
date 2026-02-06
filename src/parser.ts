@@ -1,5 +1,5 @@
 import * as vscode from "vscode";
-import * as jsonc from "jsonc-parser";
+import * as jsonc from "jsonc-parser/lib/esm/main.js";
 import { parseDocument, isMap, isScalar, isSeq, LineCounter } from "yaml";
 
 export interface DependencyInfo {

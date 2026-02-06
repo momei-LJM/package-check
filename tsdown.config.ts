@@ -6,5 +6,5 @@ export default defineConfig({
   clean: true,
   dts: false,
   external: ["vscode"],
-  // noExternal: ["fast-npm-meta", "jsonc-parser", "semver", "yaml"],
+  noExternal: ["fast-npm-meta", "semver", "yaml", /^jsonc-parser/],
 });
