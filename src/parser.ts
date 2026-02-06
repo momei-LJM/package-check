@@ -1,16 +1,16 @@
 import * as vscode from "vscode";
 import * as jsonc from "jsonc-parser";
-import { parseDocument, isMap, isScalar, isSeq } from "yaml";
+import { parseDocument, isMap, isScalar, isSeq, LineCounter } from "yaml";
 
 export interface DependencyInfo {
   name: string;
   version: string;
   range: vscode.Range;
   type:
-    | "dependencies"
-    | "devDependencies"
-    | "peerDependencies"
-    | "optionalDependencies";
+  | "dependencies"
+  | "devDependencies"
+  | "peerDependencies"
+  | "optionalDependencies";
 }
 
 export function parsePackageJson(
@@ -67,9 +67,10 @@ export function parsePackageJson(
 export function parsePnpmWorkspaceYaml(
   document: vscode.TextDocument,
 ): DependencyInfo[] {
+  const lineCounter = new LineCounter()
   const deps: DependencyInfo[] = [];
   const text = document.getText();
-  const doc = parseDocument(text);
+  const doc = parseDocument(text, { keepSourceTokens: true, lineCounter });
   if (!doc.contents || !isMap(doc.contents)) return deps;
 
   function processCatalogMap(map: any) {
@@ -78,43 +79,26 @@ export function parsePnpmWorkspaceYaml(
       if (isScalar(pair.key) && isScalar(pair.value)) {
         const name = String(pair.key.value);
         const version = String(pair.value.value);
-        // YAML ranges are [start, valueEnd, end]
-        // valueNode might be pair.value
-        const valueNode = pair.value as any;
+
+        const offset = pair.value.srcToken?.offset
+        const valueNode = pair.value;
+
+        if (offset == null) {
+          throw new Error('unexpected type')
+        }
+
         if (valueNode.range) {
-          let [start, valueEnd] = valueNode.range;
-          let pos = document.positionAt(start);
-
-          // 如果定位到了上一行的行尾（换行符），则尝试定位到该偏移量之后第一个非空白字符
-          const textAfter = document.getText().slice(start, start + 20);
-          const firstNonWhitespaceMatch = textAfter.match(/\S/);
-          if (
-            firstNonWhitespaceMatch &&
-            firstNonWhitespaceMatch.index !== undefined
-          ) {
-            pos = document.positionAt(start + firstNonWhitespaceMatch.index);
-          }
-
-          const lineNum = pos.line;
-          const lineText = document.lineAt(lineNum).text;
-
-          // 在该行中寻找版本号字符串，确保位置极其精确
-          const versionStartInLine = lineText.indexOf(version);
-
-          // debugger;
-          if (versionStartInLine !== -1) {
-            const r = new vscode.Range(
-              new vscode.Position(lineNum, versionStartInLine),
-              new vscode.Position(lineNum, versionStartInLine + version.length),
-            );
-            // 精确只包裹版本号字符串（与 package.json 方式完全一致）
-            deps.push({
-              name,
-              version,
-              range: r,
-              type: "dependencies",
-            });
-          }
+          const range = new vscode.Range(
+            document.positionAt(offset),
+            document.positionAt(offset + version.length),
+          );
+          // 精确只包裹版本号字符串（与 package.json 方式完全一致）
+          deps.push({
+            name,
+            version,
+            range,
+            type: "dependencies",
+          });
         }
       }
     }

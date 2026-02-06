@@ -18,7 +18,7 @@ export class UpdateCodeActionProvider implements vscode.CodeActionProvider {
     // debugger;
 
     // 终极兜底：如果光标在依赖行的任意位置都触发灯泡，彻底兼容 VS Code YAML 行偏移 bug
-    const cursorLine = range.start.line ;
+    const cursorLine = range.start.line;
     const txt = document.getText();
     console.log("11111111", cursorLine, txt);
 
@@ -29,7 +29,7 @@ export class UpdateCodeActionProvider implements vscode.CodeActionProvider {
         d.range.start.line === cursorLine ||
         d.range.end.line === cursorLine,
     );
-        // debugger
+    // debugger
 
     if (!dep) return [];
 
@@ -96,7 +96,7 @@ export class UpdateCodeActionProvider implements vscode.CodeActionProvider {
   ): vscode.CodeAction {
     const fix = new vscode.CodeAction(
       `Update ${name} to ${newVersion} (${type})`,
-      vscode.CodeActionKind.QuickFix,
+      vscode.CodeActionKind.Empty,
     );
     const edit = new vscode.WorkspaceEdit();
 

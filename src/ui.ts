@@ -9,7 +9,7 @@ import { UpdateSuggestion } from "./version";
 const decorationType = vscode.window.createTextEditorDecorationType({
   after: {
     margin: "0 0 0 2em",
-    color: "#888888",
+    color: "#019eff",
   },
 });
 
@@ -57,15 +57,15 @@ export function updateDecorations(
           },
           hoverMessage: new vscode.MarkdownString(
             `**Update available for ${dep.name}**\n\n` +
-              (suggestion.patch ? `- Patch: ${suggestion.patch}\n` : "") +
-              (suggestion.minor ? `- Minor: ${suggestion.minor}\n` : "") +
-              (suggestion.major ? `- Major: ${suggestion.major}\n` : ""),
+            (suggestion.patch ? `- Patch: ${suggestion.patch}\n` : "") +
+            (suggestion.minor ? `- Minor: ${suggestion.minor}\n` : "") +
+            (suggestion.major ? `- Major: ${suggestion.major}\n` : ""),
           ),
         });
 
         const diag = new vscode.Diagnostic(
           dep.range,
-          `Update available for ${dep.name}: ${suggestion.current} -> ${suggestion.major || suggestion.minor || suggestion.patch}`,
+          `[hover]:Update available for ${dep.name}: ${suggestion.current} -> ${suggestion.major || suggestion.minor || suggestion.patch}`,
           severity,
         );
         diag.source = "package-check";
