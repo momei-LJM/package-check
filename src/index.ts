@@ -79,43 +79,59 @@ export async function activate(context: vscode.ExtensionContext) {
       }
     }
 
-    const promises = deps.map(async (dep) => {
-      let version = dep.version;
-      let effectiveVersion = version;
+    // 逐个处理依赖，每处理完一个就立即更新显示
+    for (const dep of deps) {
+      try {
+        let version = dep.version;
+        let effectiveVersion = version;
+        let packageNameToQuery = dep.name;
 
-      if (isPackageJson && version.startsWith("catalog:")) {
-        const catalogName = version.split(":")[1] || "default";
-        effectiveVersion = catalogs[catalogName]?.[dep.name];
-      }
-
-      if (
-        !effectiveVersion ||
-        effectiveVersion.startsWith("workspace:") ||
-        effectiveVersion.startsWith("file:") ||
-        effectiveVersion.startsWith("link:")
-      ) {
-        return;
-      }
-
-      const meta = await getPackageMetaWithCache(dep.name);
-      if (meta) {
-        const suggestion = getUpdateSuggestion(
-          effectiveVersion,
-          meta.versions,
-          meta.latest,
-        );
-        if (suggestion) {
-          if (isPackageJson && version.startsWith("catalog:")) {
-            suggestion.catalog = version.split(":")[1] || "default";
-          }
-          suggestions.set(dep.name, suggestion);
+        // 处理 npm: 重定向 (如 packagea: "npm:packageb")
+        if (version.startsWith("npm:")) {
+          const redirectedPkg = version.slice(4); // 去掉 "npm:" 前缀
+          // 使用重定向后的包名查询，但保留原始版本用于显示
+          packageNameToQuery = redirectedPkg;
+          effectiveVersion = redirectedPkg;
         }
-      }
-    });
 
-    await Promise.all(promises);
-    if (!editor) { return }
-    updateDecorations(editor, suggestions);
+        if (isPackageJson && version.startsWith("catalog:")) {
+          const catalogName = version.split(":")[1] || "default";
+          effectiveVersion = catalogs[catalogName]?.[dep.name];
+        }
+
+        if (
+          !effectiveVersion ||
+          effectiveVersion.startsWith("workspace:") ||
+          effectiveVersion.startsWith("file:") ||
+          effectiveVersion.startsWith("link:")
+        ) {
+          continue;
+        }
+
+        const meta = await getPackageMetaWithCache(packageNameToQuery);
+        if (meta) {
+          const suggestion = getUpdateSuggestion(
+            effectiveVersion,
+            meta.versions,
+            meta.latest,
+          );
+          if (suggestion) {
+            if (isPackageJson && dep.version.startsWith("catalog:")) {
+              suggestion.catalog = dep.version.split(":")[1] || "default";
+            }
+            suggestions.set(dep.name, suggestion);
+          }
+        }
+
+        // 每处理完一个依赖就立即更新显示
+        if (editor) {
+          updateDecorations(editor, suggestions);
+        }
+      } catch (error) {
+        // 单个包的解析失败不影响其他包的解析
+        console.error(`Failed to process dependency ${dep.name}:`, error);
+      }
+    }
   }
 
   async function checkOpenDocuments() {

@@ -76,30 +76,37 @@ export function parsePnpmWorkspaceYaml(
   function processCatalogMap(map: any) {
     if (!isMap(map)) return;
     for (const pair of map.items) {
-      if (isScalar(pair.key) && isScalar(pair.value)) {
-        const name = String(pair.key.value);
-        const version = String(pair.value.value);
+      try {
+        if (isScalar(pair.key) && isScalar(pair.value)) {
+          const name = String(pair.key.value);
+          const version = String(pair.value.value);
 
-        const offset = pair.value.srcToken?.offset
-        const valueNode = pair.value;
+          const offset = pair.value.srcToken?.offset
+          const valueNode = pair.value;
 
-        if (offset == null) {
-          throw new Error('unexpected type')
+          if (offset == null) {
+            // 跳过无法解析的条目，确保其他包能正常解析
+            console.warn(`Skipping catalog entry ${name}: unable to get offset`);
+            continue;
+          }
+
+          if (valueNode.range) {
+            const range = new vscode.Range(
+              document.positionAt(offset),
+              document.positionAt(offset + version.length),
+            );
+            // 精确只包裹版本号字符串（与 package.json 方式完全一致）
+            deps.push({
+              name,
+              version,
+              range,
+              type: "dependencies",
+            });
+          }
         }
-
-        if (valueNode.range) {
-          const range = new vscode.Range(
-            document.positionAt(offset),
-            document.positionAt(offset + version.length),
-          );
-          // 精确只包裹版本号字符串（与 package.json 方式完全一致）
-          deps.push({
-            name,
-            version,
-            range,
-            type: "dependencies",
-          });
-        }
+      } catch (error) {
+        // 单个条目的解析失败不影响其他条目
+        console.warn(`Failed to process catalog entry:`, error);
       }
     }
   }
