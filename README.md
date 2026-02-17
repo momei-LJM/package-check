@@ -9,7 +9,10 @@ Package Check is a Visual Studio Code extension that detects available updates f
   - Minor (orange) — minor version bump
   - Patch (green) — patch update
 - Catalog-aware rendering for `catalog:` entries — catalog tags are visually separated and do not provide Quick Fixes (since catalog updates are managed in the workspace file).
-- Quick Fix code actions for non-catalog dependencies to update patch / minor / major versions with proper quote handling.
+- Quick Fix code actions for non-catalog dependencies with three options:
+  - `^` (lock major) — allows minor and patch updates
+  - `~` (lock minor) — allows patch updates only
+  - exact — locks to exact version
 - Uses `fast-npm-meta` to fetch registry metadata and supports caching for performance.
 
 ## Usage
