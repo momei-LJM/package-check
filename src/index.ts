@@ -1,8 +1,12 @@
 import * as vscode from "vscode";
 import { parsePackageJson, parsePnpmWorkspaceYaml } from "./parser";
-import { getPackageMetaWithCache, refreshPackageMeta, setGlobalState } from "./npm";
+import {
+  getPackageMetaWithCache,
+  refreshPackageMeta,
+  setGlobalState,
+} from "./npm";
 import { getUpdateSuggestion, UpdateSuggestion } from "./version";
-import { updateDecorations, diagnosticCollection } from "./ui";
+import { updateDecorations } from "./ui";
 import { getPnpmCatalogs } from "./pnpm";
 import { UpdateCodeActionProvider } from "./codeAction";
 
@@ -111,15 +115,8 @@ export async function activate(context: vscode.ExtensionContext) {
       const handleSuggestion = (meta: any) => {
         if (!meta) return;
 
-        const suggestion = getUpdateSuggestion(
-          effectiveVersion,
-          meta.latest,
-        );
-        if (
-          suggestion &&
-          isPackageJson &&
-          dep.version.startsWith("catalog:")
-        ) {
+        const suggestion = getUpdateSuggestion(effectiveVersion, meta.latest);
+        if (suggestion && isPackageJson && dep.version.startsWith("catalog:")) {
           suggestion.catalog = dep.version.split(":")[1] || "default";
         }
 
@@ -173,7 +170,6 @@ export async function activate(context: vscode.ExtensionContext) {
   }
 
   context.subscriptions.push(
-    diagnosticCollection,
     vscode.workspace.onDidOpenTextDocument((doc) => checkDocument(doc)),
     vscode.workspace.onDidChangeTextDocument((event) =>
       triggerCheck(event.document),

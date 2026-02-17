@@ -1,6 +1,6 @@
 import * as vscode from "vscode";
 import * as jsonc from "jsonc-parser/lib/esm/main.js";
-import { parseDocument, isMap, isScalar, isSeq, LineCounter } from "yaml";
+import { parseDocument, isMap, isScalar } from "yaml";
 
 export interface DependencyInfo {
   name: string;
@@ -67,10 +67,9 @@ export function parsePackageJson(
 export function parsePnpmWorkspaceYaml(
   document: vscode.TextDocument,
 ): DependencyInfo[] {
-  const lineCounter = new LineCounter()
   const deps: DependencyInfo[] = [];
   const text = document.getText();
-  const doc = parseDocument(text, { keepSourceTokens: true, lineCounter });
+  const doc = parseDocument(text, { keepSourceTokens: true });
   if (!doc.contents || !isMap(doc.contents)) return deps;
 
   function processCatalogMap(map: any) {

@@ -11,9 +11,6 @@ const decorationType = vscode.window.createTextEditorDecorationType({
   },
 });
 
-export const diagnosticCollection =
-  vscode.languages.createDiagnosticCollection("package-check");
-
 // 生成版本更新信息的通用部分
 function buildUpdateInfo(suggestion: UpdateSuggestion): string {
   const typeLabel = suggestion.type ? suggestion.type.toUpperCase() : "Update";
@@ -148,9 +145,4 @@ export function updateDecorations(
   }
 
   editor.setDecorations(decorationType, decorations);
-}
-
-export function clearDecorations(editor: vscode.TextEditor) {
-  editor.setDecorations(decorationType, []);
-  diagnosticCollection.delete(editor.document.uri);
 }

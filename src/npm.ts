@@ -4,7 +4,6 @@ import { getVersions, getLatestVersion } from "fast-npm-meta";
 export interface PackageVersionInfo {
   latest: string;
   versions: string[];
-  time?: Record<string, string>;
 }
 
 export interface CacheEntry {
