@@ -2,7 +2,7 @@
   "name": "package-check",
   "displayName": "Package Check",
   "description": "Check package.json dependencies for updates",
-  "version": "0.2.3",
+  "version": "0.2.4",
   "icon": "public/icon.png",
   "publisher": "momei-package-check",
   "engines": {
