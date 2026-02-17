@@ -1,12 +1,15 @@
 import * as vscode from "vscode";
 import { parsePackageJson, parsePnpmWorkspaceYaml } from "./parser";
-import { getPackageMetaWithCache } from "./npm";
+import { getPackageMetaWithCache, refreshPackageMeta, setGlobalState } from "./npm";
 import { getUpdateSuggestion, UpdateSuggestion } from "./version";
 import { updateDecorations, diagnosticCollection } from "./ui";
 import { getPnpmCatalogs } from "./pnpm";
 import { UpdateCodeActionProvider } from "./codeAction";
 
 export async function activate(context: vscode.ExtensionContext) {
+  // 初始化全局状态（持久化缓存）
+  setGlobalState(context.globalState);
+
   console.log("package-check is now active");
   let checkTimeout: NodeJS.Timeout | undefined;
 
@@ -71,67 +74,87 @@ export async function activate(context: vscode.ExtensionContext) {
 
     let catalogs: Record<string, any> = {};
     if (workspaceRoot && isPackageJson && workspaceFolder) {
-      const config = workspaceConfigCache.get(
-        workspaceFolder.uri.toString(),
-      );
+      const config = workspaceConfigCache.get(workspaceFolder.uri.toString());
       if (config?.hasPnpmWorkspaceYaml) {
         catalogs = await getPnpmCatalogs(workspaceRoot);
       }
     }
 
-    // 逐个处理依赖，每处理完一个就立即更新显示
-    for (const dep of deps) {
-      try {
-        let version = dep.version;
-        let effectiveVersion = version;
-        let packageNameToQuery = dep.name;
+    // 并发处理所有依赖，每处理完一个就立即更新显示
+    const promises = deps.map((dep) => {
+      let version = dep.version;
+      let effectiveVersion = version;
+      let packageNameToQuery = dep.name;
 
-        // 处理 npm: 重定向 (如 packagea: "npm:packageb")
-        if (version.startsWith("npm:")) {
-          const redirectedPkg = version.slice(4); // 去掉 "npm:" 前缀
-          // 使用重定向后的包名查询，但保留原始版本用于显示
-          packageNameToQuery = redirectedPkg;
-          effectiveVersion = redirectedPkg;
-        }
+      // 处理 npm: 重定向 (如 packagea: "npm:packageb")
+      if (version.startsWith("npm:")) {
+        const redirectedPkg = version.slice(4);
+        packageNameToQuery = redirectedPkg;
+        effectiveVersion = redirectedPkg;
+      }
 
-        if (isPackageJson && version.startsWith("catalog:")) {
-          const catalogName = version.split(":")[1] || "default";
-          effectiveVersion = catalogs[catalogName]?.[dep.name];
-        }
+      if (isPackageJson && version.startsWith("catalog:")) {
+        const catalogName = version.split(":")[1] || "default";
+        effectiveVersion = catalogs[catalogName]?.[dep.name];
+      }
 
+      if (
+        !effectiveVersion ||
+        effectiveVersion.startsWith("workspace:") ||
+        effectiveVersion.startsWith("file:") ||
+        effectiveVersion.startsWith("link:")
+      ) {
+        return Promise.resolve();
+      }
+
+      // 处理建议的函数
+      const handleSuggestion = (meta: any) => {
+        if (!meta) return;
+
+        const suggestion = getUpdateSuggestion(
+          effectiveVersion,
+          meta.versions,
+          meta.latest,
+        );
         if (
-          !effectiveVersion ||
-          effectiveVersion.startsWith("workspace:") ||
-          effectiveVersion.startsWith("file:") ||
-          effectiveVersion.startsWith("link:")
+          suggestion &&
+          isPackageJson &&
+          dep.version.startsWith("catalog:")
         ) {
-          continue;
+          suggestion.catalog = dep.version.split(":")[1] || "default";
         }
 
-        const meta = await getPackageMetaWithCache(packageNameToQuery);
-        if (meta) {
-          const suggestion = getUpdateSuggestion(
-            effectiveVersion,
-            meta.versions,
-            meta.latest,
-          );
-          if (suggestion) {
-            if (isPackageJson && dep.version.startsWith("catalog:")) {
-              suggestion.catalog = dep.version.split(":")[1] || "default";
-            }
-            suggestions.set(dep.name, suggestion);
+        if (suggestion) {
+          suggestions.set(dep.name, suggestion);
+          if (editor) {
+            updateDecorations(editor, suggestions);
           }
         }
+      };
 
-        // 每处理完一个依赖就立即更新显示
-        if (editor) {
-          updateDecorations(editor, suggestions);
-        }
-      } catch (error) {
-        // 单个包的解析失败不影响其他包的解析
-        console.error(`Failed to process dependency ${dep.name}:`, error);
-      }
-    }
+      // 1. 先用缓存快速显示（如果有缓存的话）
+      return getPackageMetaWithCache(packageNameToQuery)
+        .then((meta) => {
+          // 立即显示缓存数据
+          handleSuggestion(meta);
+
+          // 2. 后台刷新最新数据
+          return refreshPackageMeta(packageNameToQuery);
+        })
+        .then((meta) => {
+          // 刷新后再次更新显示（如果有新数据）
+          handleSuggestion(meta);
+        })
+        .catch((error) => {
+          console.error(
+            `Failed to fetch package ${packageNameToQuery}:`,
+            error,
+          );
+        });
+    });
+
+    // 等待所有请求完成（即使有失败也不影响）
+    return Promise.allSettled(promises);
   }
 
   async function checkOpenDocuments() {
@@ -171,4 +194,4 @@ export async function activate(context: vscode.ExtensionContext) {
   checkOpenDocuments();
 }
 
-export function deactivate() { }
+export function deactivate() {}
