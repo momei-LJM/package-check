@@ -113,7 +113,6 @@ export async function activate(context: vscode.ExtensionContext) {
 
         const suggestion = getUpdateSuggestion(
           effectiveVersion,
-          meta.versions,
           meta.latest,
         );
         if (

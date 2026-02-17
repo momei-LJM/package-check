@@ -16,11 +16,8 @@ export const diagnosticCollection =
 
 // 生成版本更新信息的通用部分
 function buildUpdateInfo(suggestion: UpdateSuggestion): string {
-  return (
-    (suggestion.patch ? `- Patch: ${suggestion.patch}\n` : "") +
-    (suggestion.minor ? `- Minor: ${suggestion.minor}\n` : "") +
-    (suggestion.major ? `- Major: ${suggestion.major}\n` : "")
-  );
+  const typeLabel = suggestion.type ? suggestion.type.toUpperCase() : "Update";
+  return `${typeLabel}: ${suggestion.latest}`;
 }
 
 // 创建版本 tag 的辅助函数
@@ -78,22 +75,20 @@ export function updateDecorations(
     const suggestion = suggestions.get(dep.name);
     if (!suggestion) continue;
 
-    let contentText = "";
+    const isCatalog = !!suggestion.catalog;
+    const arrow = isCatalog ? "" : "\u2197 ";
+    const contentText = `${arrow}${suggestion.latest}`;
+
+    // 根据类型决定颜色
     let color = "";
     let backgroundColor = "";
-    let isCatalog = !!suggestion.catalog;
-    let arrow = isCatalog ? "" : "\u2197 ";
-
-    if (suggestion.major) {
-      contentText = `${arrow}${suggestion.major}`;
+    if (suggestion.type === "major") {
       color = "#ef4444"; // Tailwind red-500
       backgroundColor = "rgba(239, 68, 68, 0.15)";
-    } else if (suggestion.minor) {
-      contentText = `${arrow}${suggestion.minor}`;
+    } else if (suggestion.type === "minor") {
       color = "#f97316"; // Tailwind orange-500
       backgroundColor = "rgba(249, 115, 22, 0.15)";
-    } else if (suggestion.patch) {
-      contentText = `${arrow}${suggestion.patch}`;
+    } else if (suggestion.type === "patch") {
       color = "#22c55e"; // Tailwind green-500
       backgroundColor = "rgba(34, 197, 94, 0.15)";
     }

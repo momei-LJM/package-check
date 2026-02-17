@@ -29,7 +29,10 @@ function getFromPersistentCache(packageName: string): PackageVersionInfo | null 
 
   const cached = globalState.get<CacheEntry>(`package-meta-${packageName}`);
   if (cached && cached.expires > Date.now()) {
-    return cached.data;
+    // 确保 latest 是字符串类型
+    if (cached.data && typeof cached.data.latest === "string") {
+      return cached.data;
+    }
   }
   return null;
 }
@@ -53,7 +56,10 @@ export function getPackageMetaWithCache(
   // 1. 先检查内存缓存
   const memoryCached = memoryCache.get(packageName);
   if (memoryCached && memoryCached.expires > Date.now()) {
-    return Promise.resolve(memoryCached.data);
+    // 确保 latest 是字符串类型
+    if (memoryCached.data && typeof memoryCached.data.latest === "string") {
+      return Promise.resolve(memoryCached.data);
+    }
   }
 
   // 2. 检查持久化缓存

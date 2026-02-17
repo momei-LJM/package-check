@@ -25,8 +25,6 @@ export class UpdateCodeActionProvider implements vscode.CodeActionProvider {
     );
     if (!dep) return [];
 
-    const workspaceRoot = vscode.workspace.getWorkspaceFolder(document.uri)?.uri
-      .fsPath;
     let version = dep.version;
     const isCatalog = !isYaml && version.startsWith("catalog:");
     if (isCatalog) return [];
@@ -34,44 +32,45 @@ export class UpdateCodeActionProvider implements vscode.CodeActionProvider {
     const meta = await getPackageMetaWithCache(dep.name);
     if (!meta) return [];
 
-    const suggestion = getUpdateSuggestion(version, meta.versions, meta.latest);
+    const suggestion = getUpdateSuggestion(version, meta.latest);
     if (!suggestion) return [];
 
     const actions: vscode.CodeAction[] = [];
+    const latest = meta.latest;
 
-    if (suggestion.patch && suggestion.patch !== suggestion.current) {
-      actions.push(
-        this.createFix(
-          document,
-          dep.range,
-          dep.name,
-          suggestion.patch,
-          "Patch",
-        ),
-      );
-    }
-    if (suggestion.minor && suggestion.minor !== suggestion.current) {
-      actions.push(
-        this.createFix(
-          document,
-          dep.range,
-          dep.name,
-          suggestion.minor,
-          "Minor",
-        ),
-      );
-    }
-    if (suggestion.major && suggestion.major !== suggestion.current) {
-      actions.push(
-        this.createFix(
-          document,
-          dep.range,
-          dep.name,
-          suggestion.major,
-          "Major",
-        ),
-      );
-    }
+    if (!latest) return [];
+
+    // 三个选项：
+    // 1. ^ - 锁定主版本号 (允许更新 minor 和 patch)
+    // 2. ~ - 锁定主次版本号 (只允许更新 patch)
+    // 3. 无符号 - 锁定全部版本号 (精确版本)
+
+    // ^ 版本
+    actions.push(
+      this.createFix(
+        document,
+        dep.range,
+        dep.name,
+        `^${latest}`,
+        "^ (lock major)",
+      ),
+    );
+
+    // ~ 版本
+    actions.push(
+      this.createFix(
+        document,
+        dep.range,
+        dep.name,
+        `~${latest}`,
+        "~ (lock minor)",
+      ),
+    );
+
+    // 精确版本
+    actions.push(
+      this.createFix(document, dep.range, dep.name, latest, "exact"),
+    );
 
     return actions;
   }
@@ -81,10 +80,10 @@ export class UpdateCodeActionProvider implements vscode.CodeActionProvider {
     range: vscode.Range,
     name: string,
     newVersion: string,
-    type: string,
+    label: string,
   ): vscode.CodeAction {
     const fix = new vscode.CodeAction(
-      `Update ${name} to ${newVersion} (${type})`,
+      `Update ${name} to ${newVersion} (${label})`,
       vscode.CodeActionKind.Empty,
     );
     const edit = new vscode.WorkspaceEdit();
@@ -111,7 +110,6 @@ export class UpdateCodeActionProvider implements vscode.CodeActionProvider {
     }
 
     fix.edit = edit;
-    fix.isPreferred = type !== "Major";
     return fix;
   }
 }
